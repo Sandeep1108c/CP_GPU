@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
+    <FileList>
+        <File path="../rtl/top_board.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/gpu_top.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/vga_timing.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/color_generator.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/palette_lut.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/tmds_encoder.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/sdram_ctrl.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/sdram_arbiter.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/spi_slave.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/cmd_decoder.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/blitter.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/rasterizer.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/gowin_rpll.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/hdmi_tx.v" type="file.verilog" enable="1"/>
+        <File path="../rtl/video_scanout.v" type="file.verilog" enable="1"/>
+        <File path="../constraints/tang_nano_20k.cst" type="file.cst" enable="1"/>
+    </FileList>
+</Project>

@@ -1,0 +1,56 @@
+GowinSynthesis start
+Running parser ...
+Analyzing Verilog file 'D:\CP GPU\rtl\top_board.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\gpu_top.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\vga_timing.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\color_generator.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\palette_lut.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\tmds_encoder.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\sdram_ctrl.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\sdram_arbiter.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\spi_slave.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\cmd_decoder.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\blitter.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\rasterizer.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\gowin_rpll.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\hdmi_tx.v'
+Analyzing Verilog file 'D:\CP GPU\rtl\video_scanout.v'
+Compiling module 'top_board'("D:\CP GPU\rtl\top_board.v":14)
+Compiling module 'gpu_top'("D:\CP GPU\rtl\gpu_top.v":21)
+Compiling module 'gowin_rpll'("D:\CP GPU\rtl\gowin_rpll.v":13)
+Compiling module 'vga_timing'("D:\CP GPU\rtl\vga_timing.v":24)
+Compiling module 'spi_slave'("D:\CP GPU\rtl\spi_slave.v":25)
+Compiling module 'cmd_decoder'("D:\CP GPU\rtl\cmd_decoder.v":30)
+Compiling module 'blitter'("D:\CP GPU\rtl\blitter.v":21)
+Compiling module 'rasterizer'("D:\CP GPU\rtl\rasterizer.v":18)
+Compiling module 'sdram_arbiter'("D:\CP GPU\rtl\sdram_arbiter.v":19)
+Compiling module 'sdram_ctrl(FREQ=25200000)'("D:\CP GPU\rtl\sdram_ctrl.v":22)
+Compiling module 'video_scanout'("D:\CP GPU\rtl\video_scanout.v":21)
+Extracting RAM for identifier 'line_ram'("D:\CP GPU\rtl\video_scanout.v":54)
+Compiling module 'palette_lut'("D:\CP GPU\rtl\palette_lut.v":23)
+Extracting RAM for identifier 'lut_mem'("D:\CP GPU\rtl\palette_lut.v":49)
+Compiling module 'color_generator'("D:\CP GPU\rtl\color_generator.v":16)
+Compiling module 'hdmi_tx'("D:\CP GPU\rtl\hdmi_tx.v":18)
+Compiling module 'tmds_encoder'("D:\CP GPU\rtl\tmds_encoder.v":152)
+Compiling module 'tmds_channel'("D:\CP GPU\rtl\tmds_encoder.v":39)
+NOTE  (EX0101) : Current top module is "top_board"
+[5%] Running netlist conversion ...
+WARN  (CV0016) : Input key_reset is unused("D:\CP GPU\rtl\top_board.v":16)
+Running device independent optimization ...
+[10%] Optimizing Phase 0 completed
+[15%] Optimizing Phase 1 completed
+[25%] Optimizing Phase 2 completed
+Running inference ...
+[30%] Inferring Phase 0 completed
+[40%] Inferring Phase 1 completed
+[50%] Inferring Phase 2 completed
+[55%] Inferring Phase 3 completed
+Running technical mapping ...
+[60%] Tech-Mapping Phase 0 completed
+[65%] Tech-Mapping Phase 1 completed
+[75%] Tech-Mapping Phase 2 completed
+[80%] Tech-Mapping Phase 3 completed
+[90%] Tech-Mapping Phase 4 completed
+[95%] Generate netlist file "D:\CP GPU\gowin\impl\gwsynthesis\tang_nano_20k_gpu.vg" completed
+[100%] Generate report file "D:\CP GPU\gowin\impl\gwsynthesis\tang_nano_20k_gpu_syn.rpt.html" completed
+GowinSynthesis finish

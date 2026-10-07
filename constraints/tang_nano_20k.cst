@@ -1,0 +1,82 @@
+// =============================================================================
+// Physical Constraints File (.cst) for Tang Nano 20K (GW2AR-LV18QN88C8/I7)
+// Project: Custom FPGA-Based GPU — Woxsen University
+// =============================================================================
+
+// Clock & Reset
+IO_LOC "sys_clk" 4;
+IO_PORT "sys_clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE;
+
+IO_LOC "key_reset" 88;
+IO_PORT "key_reset" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// Onboard LEDs (Active-Low)
+IO_LOC "led[0]" 15;
+IO_PORT "led[0]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led[1]" 16;
+IO_PORT "led[1]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led[2]" 17;
+IO_PORT "led[2]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led[3]" 18;
+IO_PORT "led[3]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led[4]" 19;
+IO_PORT "led[4]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led[5]" 20;
+IO_PORT "led[5]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// Header Pins for VGA / Oscilloscope verification
+IO_LOC "vga_hsync" 73;
+IO_PORT "vga_hsync" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "vga_vsync" 74;
+IO_PORT "vga_vsync" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "vga_rgb[2]" 75;
+IO_PORT "vga_rgb[2]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "vga_rgb[1]" 76;
+IO_PORT "vga_rgb[1]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "vga_rgb[0]" 77;
+IO_PORT "vga_rgb[0]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// =============================================================================
+// Physical HDMI Interface (Onboard connector: Pins 33-40)
+// Driven by ELVDS_OBUF differential output buffers
+// =============================================================================
+IO_LOC "tmds_clk_p" 33,34;
+IO_PORT "tmds_clk_p" PULL_MODE=NONE;
+
+IO_LOC "tmds_d_p[0]" 35,36;
+IO_PORT "tmds_d_p[0]" PULL_MODE=NONE;
+
+IO_LOC "tmds_d_p[1]" 37,38;
+IO_PORT "tmds_d_p[1]" PULL_MODE=NONE;
+
+IO_LOC "tmds_d_p[2]" 39,40;
+IO_PORT "tmds_d_p[2]" PULL_MODE=NONE;
+
+// =============================================================================
+// SPI Slave Interface (ESP32 / ESP32-S3 Master -> FPGA Slave)
+// Mapped to physical Tang Nano 20K header pins:
+//   Pin 86 = spi_cs_n
+//   Pin 49 = spi_sclk
+//   Pin 55 = spi_mosi
+//   Pin 48 = spi_miso
+// =============================================================================
+IO_LOC "spi_cs_n" 86;
+IO_PORT "spi_cs_n" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+IO_LOC "spi_sclk" 49;
+IO_PORT "spi_sclk" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "spi_mosi" 48;
+IO_PORT "spi_mosi" IO_TYPE=LVCMOS33 PULL_MODE=NONE;
+
+IO_LOC "spi_miso" 51;
+IO_PORT "spi_miso" IO_TYPE=LVCMOS33 DRIVE=8 PULL_MODE=NONE;

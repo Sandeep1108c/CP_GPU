@@ -1,0 +1,33 @@
+[*]
+[*] GTKWave Save File
+[*] Custom FPGA GPU Simulation — Woxsen University
+[*]
+[dumpfile] "gpu_sim.vcd"
+[savefile] "gpu_waves.gtkw"
+[timestart] 0
+[size] 1920 1080
+[pos] -1 -1
+*-16.000000 35000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] gpu_testbench.
+[sst_width] 250
+[signals_width] 200
+[sst_expanded] 1
+[sst_vpaned_height] 300
+@28
+gpu_testbench.clk_27m
+gpu_testbench.dut.clk_25m
+gpu_testbench.reset
+@28
+gpu_testbench.dut.hsync
+gpu_testbench.dut.vsync
+@28
+gpu_testbench.dut.video_active
+@22
+gpu_testbench.dut.pixel_x[9:0]
+gpu_testbench.dut.pixel_y[9:0]
+@22
+gpu_testbench.dut.red[7:0]
+gpu_testbench.dut.green[7:0]
+gpu_testbench.dut.blue[7:0]
+[pattern_trace] 1
+[pattern_trace] 0

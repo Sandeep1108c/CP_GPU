@@ -1,0 +1,17 @@
+# Simulation waveforms and compiled binaries
+*.vcd
+*.vvp
+
+# Python cache & compiled bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# AI chat / conversation export logs
+FULL_CONVERSATION_HISTORY.*
+
+# OS & temporary files
+.DS_Store
+Thumbs.db
+*.tmp

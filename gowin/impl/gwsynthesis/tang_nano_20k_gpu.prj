@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE gowin-synthesis-project>
+<Project>
+    <Version>beta</Version>
+    <Device id="GW2AR-18C" package="QFN88" speed="8" partNumber="GW2AR-LV18QN88C8/I7"/>
+    <FileList>
+        <File path="D:\CP GPU\rtl\top_board.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\gpu_top.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\vga_timing.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\color_generator.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\palette_lut.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\tmds_encoder.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\sdram_ctrl.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\sdram_arbiter.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\spi_slave.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\cmd_decoder.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\blitter.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\rasterizer.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\gowin_rpll.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\hdmi_tx.v" type="verilog"/>
+        <File path="D:\CP GPU\rtl\video_scanout.v" type="verilog"/>
+    </FileList>
+    <OptionList>
+        <Option type="disable_insert_pad" value="0"/>
+        <Option type="dsp_style" value="auto"/>
+        <Option type="global_freq" value="100.000"/>
+        <Option type="looplimit" value="2000"/>
+        <Option type="map_option" value="1"/>
+        <Option type="max_fanout" value="1000"/>
+        <Option type="netlist_hierarchy" value="1"/>
+        <Option type="opt_goal" value="auto"/>
+        <Option type="output_file" value="D:\CP GPU\gowin\impl\gwsynthesis\tang_nano_20k_gpu.vg"/>
+        <Option type="print_all_synthesis_warning" value="0"/>
+        <Option type="ram_rw_check" value="0"/>
+        <Option type="ram_style" value="auto"/>
+        <Option type="rom_style" value="auto"/>
+        <Option type="shift_reg" value="auto"/>
+        <Option type="top_module" value="top_board"/>
+        <Option type="vcc" value="1.0"/>
+        <Option type="verilog_language" value="verilog-2001"/>
+        <Option type="vhdl_language" value="vhdl-1993"/>
+    </OptionList>
+</Project>
