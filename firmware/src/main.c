@@ -163,13 +163,30 @@ static void draw_village_world(uint32_t frame_count) {
     gpu_draw_rect(572, 156, 52, 228, COL_DARK_BLUE);
     gpu_draw_rect(578, 156, 40, 228, COL_BRIGHT_BLUE);
     for (int wy = 168; wy <= 360; wy += 48) {
-        gpu_draw_sprite(588, wy + ((frame_count >> 2) & 0x07), SPRITE_ID_TILE_WATER, GPU_SPRITE_SIZE_16x16);
+        uint16_t w_spr = (wy == 264) ? SPRITE_ID_TILE_LILYPAD_WATER : SPRITE_ID_TILE_WATER;
+        gpu_draw_sprite(588, wy + ((frame_count >> 2) & 0x07), w_spr, GPU_SPRITE_SIZE_16x16);
     }
     gpu_draw_rect(412, 248, 148, 120, COL_BROWN);
     gpu_draw_rect(420, 260, 132, 100, COL_WOOD_FLOOR);
     gpu_draw_sprite(432, 284, SPRITE_ID_PROP_HANDCART,    GPU_SPRITE_SIZE_32x32 | GPU_SPRITE_TRANS_EN);
     gpu_draw_sprite(424, 264, SPRITE_ID_PROP_WHEAT_STRAW, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
     gpu_draw_sprite(532, 332, SPRITE_ID_PROP_GOLD_CHEST,  GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+
+    // Valley Nature: Pine Trees, Blooming Sakura Cherry Trees, Berry Bushes & Campfires
+    gpu_draw_sprite(224, 96,  SPRITE_ID_TILE_BUSH_BERRY,  GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(368, 160, SPRITE_ID_TILE_BUSH_BERRY,  GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(4,   8,   SPRITE_ID_PROP_PINE_TREE,   GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(196, 16,  SPRITE_ID_PROP_CHERRY_TREE, GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(244, 28,  SPRITE_ID_PROP_PINE_TREE,   GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(592, 24,  SPRITE_ID_PROP_PINE_TREE,   GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(236, 140, SPRITE_ID_PROP_CHERRY_TREE, GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(204, 332, SPRITE_ID_PROP_CHERRY_TREE, GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
+
+    uint16_t fire_spr = ((frame_count >> 2) & 1) ? SPRITE_ID_TILE_CAMPFIRE_1 : SPRITE_ID_TILE_CAMPFIRE_2;
+    gpu_draw_sprite(140, 140, fire_spr, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(340, 224, fire_spr, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(276, 140, fire_spr, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(136, 252, fire_spr, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
 }
 
 void app_main(void) {

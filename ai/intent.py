@@ -233,12 +233,12 @@ class DialogueState:
             self.current_tier = QUERY_TO_TIER.get(res, self.current_depth + 1)
             return res
 
-        # 3. Spiked drink / dizziness / poison inquiry (Tier 3)
-        if re.search(r"\b(dizzy|spiked|drink spiked|cider|drugged|poison|poisoned|passed out|fainted)\b", clean):
+        # 3. Spiked drink / dizziness / poison / cider flask inspection (Tier 3)
+        if re.search(r"\b(dizzy|spiked|drink spiked|cider|flask|drugged|poison|poisoned|passed out|fainted)\b", clean):
             return self._set_state("PATROL", 3, "why were you dizzy")
 
-        # 4. Physical evidence / Key hiding spot / Stash of key (Tier 3)
-        if re.search(r"\b(physical evidence|evidence hidden|where is the key|where is the missing.*key|where.*key.*hidden|hidden in.*cane|what is hidden in.*cane|unscrew.*cane|skeleton key)\b", clean):
+        # 4. Physical evidence / Key hiding spot / Rainwater barrel inspection (Tier 3)
+        if re.search(r"\b(physical evidence|evidence hidden|where is the key|where is the missing.*key|where.*key.*hidden|hidden in.*cane|what is hidden in.*cane|unscrew.*cane|skeleton key|rainwater barrel|inspect.*barrel|check.*barrel|inside.*barrel)\b", clean):
             return self._set_state("KEYS", 3, "where is the key")
 
         # 5. Cane / Bone tip inquiry (Tier 2)
@@ -263,8 +263,8 @@ class DialogueState:
         if re.search(r"\b(what was in the vault|what was stolen|how much.*(taken|stolen|gold|silver)|what did (they|the thief) (take|steal)|what was taken)\b", clean):
             return self._set_state("THEFT", 3, "what was in the vault")
 
-        # 10. Loot / Treasure / Cart destination / Where is the gold hidden (Tier 3)
-        if re.search(r"\b(where is the (loot|treasure|gold|stolen)|where did (you|they) hide|where are they hiding|where did they haul|where did the (wagon|cart|squeaky cart|handcart|barrow) go|which way did the (cart|wagon|tracks)|where were they pushing|wheel the handcart)\b", clean):
+        # 10. Loot / Treasure / Cart destination / Hay bales / Crypt / Silo inspection (Tier 3)
+        if re.search(r"\b(where is the (loot|treasure|gold|stolen)|where did (you|they) hide|where are they hiding|where did they haul|where did the (wagon|cart|squeaky cart|handcart|barrow) go|which way did the (cart|wagon|tracks)|where were they pushing|wheel the handcart|hay bales|search.*crypt|chapel crypt|grain silo|false floor)\b", clean):
             if npc == "KID":
                 return self._set_state("LOOT", 3, "where are they hiding the loot")
             return self._set_state("LOOT", 3, "where is the loot")

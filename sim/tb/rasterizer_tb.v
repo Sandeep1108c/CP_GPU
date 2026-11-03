@@ -57,6 +57,7 @@ module rasterizer_tb;
 
     // Memory controller interface
     wire                  mem_wr;
+    wire                  mem_wr32;
     wire       [22:0]     mem_addr;
     wire       [7:0]      mem_wdata;
     reg                   mem_ready;
@@ -100,6 +101,7 @@ module rasterizer_tb;
         .buf_back_idx (buf_back_idx),
 
         .mem_wr       (mem_wr),
+        .mem_wr32     (mem_wr32),
         .mem_addr     (mem_addr),
         .mem_wdata    (mem_wdata),
         .mem_ready    (mem_ready)
@@ -121,8 +123,8 @@ module rasterizer_tb;
             if (mem_wr) begin
                 if (write_count == 0)
                     first_write_addr <= mem_addr;
-                write_count     <= write_count + 1;
-                last_write_addr <= mem_addr;
+                write_count     <= write_count + ((mem_wr32 && rect_busy) ? 4 : 1);
+                last_write_addr <= mem_addr + ((mem_wr32 && rect_busy) ? 23'd3 : 23'd0);
                 last_write_data <= mem_wdata;
             end
         end

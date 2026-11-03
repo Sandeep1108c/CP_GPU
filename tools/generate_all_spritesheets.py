@@ -649,6 +649,48 @@ def draw_world_tiles():
     d7.point([(12, 8)], fill=(255, 215, 0, 255)) # Brass keyhole
     tiles.append(("TILE_VAULT_DOOR", t7))
 
+    # 9. Lush Flowering Berry Bush on Grass (16x16)
+    t8 = t0.copy()
+    d8 = ImageDraw.Draw(t8)
+    d8.ellipse([2, 4, 13, 14], fill=(0, 100, 0, 255), outline=(20, 70, 20, 255))
+    d8.ellipse([3, 3, 12, 11], fill=(34, 139, 34, 255))
+    d8.ellipse([5, 4, 10, 8], fill=(50, 205, 50, 255))
+    d8.point([(5, 6), (9, 5), (6, 10), (11, 9)], fill=(255, 30, 30, 255)) # Red berries
+    d8.point([(8, 7), (4, 8)], fill=(255, 215, 0, 255)) # Golden blossoms
+    tiles.append(("TILE_BUSH_BERRY", t8))
+
+    # 10. Pond Water with Lotus Lilypad (16x16)
+    t9 = t3.copy()
+    d9 = ImageDraw.Draw(t9)
+    d9.ellipse([3, 4, 13, 13], fill=(34, 139, 34, 255), outline=(0, 100, 0, 255))
+    d9.polygon([(8, 8), (13, 7), (13, 10)], fill=(30, 144, 255, 255)) # Lilypad notch
+    d9.ellipse([6, 5, 10, 9], fill=(255, 105, 180, 255)) # Pink lotus flower
+    d9.point([(8, 7)], fill=(255, 215, 0, 255)) # Lotus stamen
+    tiles.append(("TILE_LILYPAD_WATER", t9))
+
+    # 11. Stone Campfire / Lantern Brazier Frame 1 (16x16)
+    t10 = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d10 = ImageDraw.Draw(t10)
+    d10.ellipse([2, 10, 13, 15], fill=(90, 90, 95, 255), outline=(50, 50, 55, 255)) # Stone ring
+    d10.line([(4, 12), (11, 10)], fill=(120, 70, 30, 255), width=2) # Crossed logs
+    d10.line([(4, 10), (11, 12)], fill=(100, 55, 20, 255), width=2)
+    d10.polygon([(8, 2), (12, 9), (8, 12), (4, 9)], fill=(255, 69, 0, 255)) # Outer flame
+    d10.polygon([(8, 4), (10, 9), (8, 11), (6, 9)], fill=(255, 215, 0, 255)) # Inner golden flame
+    d10.point([(5, 3), (11, 4)], fill=(255, 215, 0, 255)) # Rising sparks
+    tiles.append(("TILE_CAMPFIRE_1", t10))
+
+    # 12. Stone Campfire / Lantern Brazier Frame 2 (16x16 - Flicker)
+    t11 = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d11 = ImageDraw.Draw(t11)
+    d11.ellipse([2, 10, 13, 15], fill=(90, 90, 95, 255), outline=(50, 50, 55, 255))
+    d11.line([(4, 12), (11, 10)], fill=(120, 70, 30, 255), width=2)
+    d11.line([(4, 10), (11, 12)], fill=(100, 55, 20, 255), width=2)
+    d11.polygon([(7, 1), (13, 8), (8, 12), (3, 9)], fill=(255, 69, 0, 255)) # Swayed outer flame
+    d11.polygon([(7, 3), (11, 8), (8, 11), (5, 9)], fill=(255, 215, 0, 255)) # Swayed inner flame
+    d11.point([(8, 5)], fill=(255, 255, 255, 255)) # White-hot core
+    d11.point([(4, 2), (12, 3)], fill=(255, 140, 0, 255)) # Rising sparks
+    tiles.append(("TILE_CAMPFIRE_2", t11))
+
     return tiles
 
 # =============================================================================
@@ -739,6 +781,33 @@ def draw_clues_and_props():
     d8.rectangle([5, 8, 10, 12], fill=(200, 100, 30, 255)) # Spiced cider fluid
     props.append(("PROP_CIDER_FLASK", p8))
 
+    # 10. Tall Valley Pine Tree (16x32 - Nature Forest Asset)
+    p9 = Image.new("RGBA", (16, 32), (0, 0, 0, 0))
+    d9 = ImageDraw.Draw(p9)
+    d9.ellipse([3, 27, 12, 31], fill=(20, 70, 20, 255)) # Base shadow
+    d9.rectangle([6, 21, 9, 30], fill=(120, 70, 30, 255), outline=(80, 45, 15, 255)) # Trunk
+    # Three lush layered pine tiers
+    d9.polygon([(8, 11), (15, 23), (1, 23)], fill=(0, 100, 0, 255), outline=(15, 65, 15, 255))
+    d9.polygon([(8, 6), (14, 17), (2, 17)], fill=(34, 139, 34, 255), outline=(0, 100, 0, 255))
+    d9.polygon([(8, 1), (13, 11), (3, 11)], fill=(50, 205, 50, 255), outline=(34, 139, 34, 255))
+    d9.point([(7, 4), (6, 9), (9, 14), (5, 19)], fill=(154, 205, 50, 255)) # Sunlit needles
+    props.append(("PROP_PINE_TREE", p9))
+
+    # 11. Blooming Sakura Cherry Blossom Tree (16x32 - Anime Nature Asset)
+    p10 = Image.new("RGBA", (16, 32), (0, 0, 0, 0))
+    d10 = ImageDraw.Draw(p10)
+    d10.ellipse([3, 27, 12, 31], fill=(20, 70, 20, 255)) # Base shadow
+    d10.rectangle([6, 18, 9, 30], fill=(100, 55, 30, 255), outline=(70, 35, 15, 255)) # Dark bark trunk
+    d10.line([(7, 19), (4, 14)], fill=(100, 55, 30, 255), width=2) # Left branch
+    d10.line([(8, 18), (12, 14)], fill=(100, 55, 30, 255), width=2) # Right branch
+    # Lush pink sakura canopy clouds
+    d10.ellipse([1, 6, 11, 17], fill=(255, 105, 180, 255), outline=(199, 21, 133, 255))
+    d10.ellipse([5, 6, 15, 17], fill=(255, 105, 180, 255), outline=(199, 21, 133, 255))
+    d10.ellipse([3, 2, 13, 13], fill=(255, 182, 193, 255), outline=(255, 105, 180, 255))
+    d10.point([(6, 5), (9, 6), (4, 10), (11, 10), (8, 8)], fill=(255, 255, 255, 255)) # Blossom highlights
+    d10.point([(3, 22), (12, 25)], fill=(255, 182, 193, 255)) # Falling petals
+    props.append(("PROP_CHERRY_TREE", p10))
+
     return props
 
 # =============================================================================
@@ -774,6 +843,25 @@ def draw_ui_elements():
     d3.rectangle([0, 0, 15, 15], outline=(218, 165, 32, 255))
     d3.rectangle([2, 2, 13, 13], outline=(70, 90, 130, 255))
     ui.append(("UI_DIALOGUE_BORDER", u3))
+
+    # 5. Interactive Exclamation Alert Bubble "!" (16x16)
+    u4 = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d4 = ImageDraw.Draw(u4)
+    d4.ellipse([2, 1, 13, 12], fill=(255, 255, 255, 255), outline=(218, 165, 32, 255))
+    d4.polygon([(6, 12), (9, 12), (7, 15)], fill=(255, 255, 255, 255))
+    d4.rectangle([7, 3, 8, 7], fill=(255, 30, 30, 255)) # Red "!" stem
+    d4.rectangle([7, 9, 8, 10], fill=(255, 30, 30, 255)) # Red "!" dot
+    ui.append(("UI_EXCLAMATION", u4))
+
+    # 6. Chiptune Sound / Music Note Icon (16x16)
+    u5 = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d5 = ImageDraw.Draw(u5)
+    d5.line([(6, 11), (6, 3)], fill=(0, 255, 255, 255), width=2)
+    d5.line([(13, 10), (13, 2)], fill=(0, 255, 255, 255), width=2)
+    d5.line([(6, 3), (13, 2)], fill=(255, 215, 0, 255), width=2) # Golden beam
+    d5.ellipse([3, 10, 7, 13], fill=(0, 255, 255, 255), outline=(255, 255, 255, 255))
+    d5.ellipse([10, 9, 14, 12], fill=(0, 255, 255, 255), outline=(255, 255, 255, 255))
+    ui.append(("UI_NOTE_MUSIC", u5))
 
     return ui
 
@@ -986,12 +1074,16 @@ def main():
     props_sheet.save(props_sheet_path)
     print(f"[2/6] Investigation Props saved: {props_sheet_path} ({len(clues_and_props)} props)")
 
-    # Place 32x32 props (PROP_HANDCART, 1024B) immediately after the 6 character blocks (offset 0x004800)
+    # Place 32x32 props (PROP_HANDCART, 1024B) immediately after the 6 character blocks (offset 0x004800),
+    # followed by 16x32 nature props (PROP_PINE_TREE, PROP_CHERRY_TREE, 512B each at 0x004C00 and 0x004E00),
     # so that every 32x32, 16x32, and 16x16 sprite sits on an exact multiple of its byte size
     # for the FPGA hardware blitter (src_base = 0x100000 + (sprite_id * size_bytes)).
     for name, img in clues_and_props:
         if img.size == (32, 32):
             all_sprites.append({"name": name, "img": img, "width": 32, "height": 32})
+    for name, img in clues_and_props:
+        if img.size == (16, 32):
+            all_sprites.append({"name": name, "img": img, "width": 16, "height": 32})
 
     # World Tiles (16x16, 256B each)
     world_tiles = draw_world_tiles()
@@ -1005,8 +1097,8 @@ def main():
 
     # Remaining 16x16 Clues & Props (256B each)
     for name, img in clues_and_props:
-        if img.size != (32, 32):
-            all_sprites.append({"name": name, "img": img, "width": img.size[0], "height": img.size[1]})
+        if img.size == (16, 16):
+            all_sprites.append({"name": name, "img": img, "width": 16, "height": 16})
 
     # UI Elements (16x16, 256B each)
     ui_elements = draw_ui_elements()

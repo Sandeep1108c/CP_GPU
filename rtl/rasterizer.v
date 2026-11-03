@@ -16,7 +16,8 @@
 `timescale 1ns / 1ps
 
 module rasterizer #(
-    parameter [18:0] CLEAR_PIXELS = 19'd307200 // 640 * 480
+    parameter [18:0] CLEAR_PIXELS = 19'd307200, // 640 * 480
+    parameter        RECT_FAST_32 = 1           // Enable 4-pixel (32-bit) burst writes for aligned rect spans
 ) (
     input  wire                   clk,
     input  wire                   reset,
@@ -174,6 +175,12 @@ module rasterizer #(
                                 {4'd0, rect_ry, 9'd0} +
                                 {6'd0, rect_ry, 7'd0} +
                                 {13'd0, rect_rx};
+
+    // 4-pixel burst eligibility: 32-bit aligned X coordinate and at least 4 pixels remaining on scanline
+    wire rect_can_wr32 = (RECT_FAST_32 != 0) &&
+                         (rect_rx[1:0] == 2'b00) &&
+                         ((rect_rx + 10'd4) <= clip_x1);
+    wire [9:0] rect_step_x = rect_can_wr32 ? 10'd4 : 10'd1;
 
     // Rectangle boundary clipping calculations at trigger time
     wire signed [17:0] s_rx  = {{2{rect_x[15]}}, rect_x};
@@ -341,10 +348,11 @@ module rasterizer #(
                 end
 
                 // -------------------------------------------------------------
-                // ST_RECT_REQ: Issue Memory Write for Current Rect Pixel
+                // ST_RECT_REQ: Issue Memory Write for Current Rect Pixel/Span
                 // -------------------------------------------------------------
                 ST_RECT_REQ: begin
                     mem_wr    <= 1'b1;
+                    mem_wr32  <= rect_can_wr32;
                     mem_addr  <= rect_dst_addr;
                     mem_wdata <= active_color;
                     state     <= ST_RECT_WAIT;
@@ -354,12 +362,14 @@ module rasterizer #(
                 // ST_RECT_WAIT: Await Memory Acceptance and Advance Rect Pixel
                 // -------------------------------------------------------------
                 ST_RECT_WAIT: begin
-                    mem_wr <= 1'b1;
+                    mem_wr   <= 1'b1;
+                    mem_wr32 <= rect_can_wr32;
 
                     if (mem_ready) begin
-                        mem_wr <= 1'b0;
-                        if (rect_rx + 10'd1 < clip_x1) begin
-                            rect_rx <= rect_rx + 10'd1;
+                        mem_wr   <= 1'b0;
+                        mem_wr32 <= 1'b0;
+                        if (rect_rx + rect_step_x < clip_x1) begin
+                            rect_rx <= rect_rx + rect_step_x;
                             state   <= ST_RECT_REQ;
                         end else begin
                             rect_rx <= clip_x0;
