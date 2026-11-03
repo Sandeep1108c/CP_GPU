@@ -113,8 +113,8 @@ module cmd_decoder (
     output reg         sdram_load_start, // Asserted during upload burst
     output reg  [23:0] sdram_load_addr,  // 24-bit SDRAM destination byte address
     output reg  [7:0]  sdram_load_data,  // Pixel byte to write
-    output reg         sdram_load_valid, // 1-cycle strobe per written byte
-    input  wire        sdram_load_ready, // High when SDRAM controller can accept byte
+    output reg         sdram_load_valid, // Held high until sdram_load_ready accepts byte
+    input  wire        sdram_load_ready, // High when SDRAM arbiter accepts byte
 
     // -------------------------------------------------------------------------
     // Status & Diagnostics
@@ -160,39 +160,39 @@ module cmd_decoder (
     end
     wire vsync_rising = (vsync && !vsync_d);
 
-    // Overall GPU busy status (hardware rendering engines only)
-    assign gpu_busy = clear_busy | sprite_busy | line_busy | rect_busy;
+    // Overall GPU busy status (hardware rendering engines + active SDRAM load)
+    wire engine_busy = clear_busy | sprite_busy | line_busy | rect_busy |
+                       clear_start | sprite_start | line_start | rect_start |
+                       sdram_load_valid;
+    assign gpu_busy = engine_busy;
 
     // =========================================================================
     // Telemetry Generator (MISO Status Byte)
     // =========================================================================
-    // Bit 0: gpu_busy
     // Telemetry Mapping:
     // Bits [7:5]: Signature 3'b010
     // Bit 4: buf_front_idx
     // Bit 3: rect_busy
     // Bit 2: line_busy
     // Bit 1: sprite_busy
-    // Bit 0: clear_busy
+    // Bit 0: clear_busy / sdram_load_valid
     wire [7:0] current_telemetry = {
-        3'b010,           // Signature [7:5]
-        buf_front_idx,    // [4]
-        rect_busy,        // [3]
-        line_busy,        // [2]
-        sprite_busy,      // [1]
-        clear_busy        // [0]
+        3'b010,                                       // Signature [7:5]
+        buf_front_idx,                                // [4]
+        rect_busy   | rect_start,                     // [3]
+        line_busy   | line_start,                     // [2]
+        sprite_busy | sprite_start,                   // [1]
+        clear_busy  | clear_start | sdram_load_valid  // [0]
     };
 
+    // Continuously keep spi_slave TX buffer loaded with real-time telemetry
     always @(posedge clk) begin
         if (reset) begin
             tx_data <= 8'h40;
             tx_load <= 1'b0;
         end else begin
-            tx_load <= 1'b0;
-            if (tx_ready) begin
-                tx_data <= current_telemetry;
-                tx_load <= 1'b1;
-            end
+            tx_data <= current_telemetry;
+            tx_load <= 1'b1;
         end
     end
 
@@ -269,7 +269,12 @@ module cmd_decoder (
             sprite_start     <= 1'b0;
             line_start       <= 1'b0;
             rect_start       <= 1'b0;
-            sdram_load_valid <= 1'b0;
+
+            // Hold sdram_load_valid until SDRAM arbiter asserts sdram_load_ready
+            if (sdram_load_valid && sdram_load_ready) begin
+                sdram_load_valid <= 1'b0;
+                sdram_load_addr  <= sdram_load_addr + 24'd1;
+            end
 
             // CS Abort Protection
             if (!cs_active && (
@@ -280,6 +285,7 @@ module cmd_decoder (
                 cmd_busy         <= 1'b0;
                 cmd_error        <= 1'b1;
                 sdram_load_start <= 1'b0;
+                sdram_load_valid <= 1'b0;
             end else begin
                 case (state)
                     // ---------------------------------------------------------
@@ -399,8 +405,6 @@ module cmd_decoder (
                                         default: begin
                                             sdram_load_data  <= rx_data;
                                             sdram_load_valid <= 1'b1;
-                                            if (payload_cnt > 8'd3)
-                                                sdram_load_addr <= sdram_load_addr + 24'd1;
                                         end
                                     endcase
                                 end
@@ -418,54 +422,67 @@ module cmd_decoder (
                     ST_EXEC: begin
                         case (active_cmd)
                             OP_NOP: begin
-                                state <= ST_IDLE;
+                                cmd_busy <= 1'b0;
+                                state    <= ST_IDLE;
                             end
 
                             OP_SWAP_BUFFER: begin
-                                swap_pending <= 1'b1;
-                                state        <= ST_IDLE;
+                                if (!engine_busy) begin
+                                    swap_pending <= 1'b1;
+                                    cmd_busy     <= 1'b0;
+                                    state        <= ST_IDLE;
+                                end
                             end
 
                             OP_SET_PALETTE: begin
                                 palette_wr_en <= 1'b1;
+                                cmd_busy      <= 1'b0;
                                 state         <= ST_IDLE;
                             end
 
                             OP_CLEAR: begin
-                                if (!gpu_busy) begin
+                                if (!engine_busy) begin
                                     clear_start <= 1'b1;
+                                    cmd_busy    <= 1'b0;
                                     state       <= ST_IDLE;
                                 end
                             end
 
                             OP_DRAW_SPRITE: begin
-                                if (!gpu_busy) begin
+                                if (!engine_busy) begin
                                     sprite_start <= 1'b1;
+                                    cmd_busy     <= 1'b0;
                                     state        <= ST_IDLE;
                                 end
                             end
 
                             OP_DRAW_LINE: begin
-                                if (!gpu_busy) begin
+                                if (!engine_busy) begin
                                     line_start <= 1'b1;
+                                    cmd_busy   <= 1'b0;
                                     state      <= ST_IDLE;
                                 end
                             end
 
                             OP_DRAW_RECT: begin
-                                if (!gpu_busy) begin
+                                if (!engine_busy) begin
                                     rect_start <= 1'b1;
+                                    cmd_busy   <= 1'b0;
                                     state      <= ST_IDLE;
                                 end
                             end
 
                             OP_LOAD_SPRITE: begin
-                                sdram_load_start <= 1'b0;
-                                state            <= ST_IDLE;
+                                if (!sdram_load_valid) begin
+                                    sdram_load_start <= 1'b0;
+                                    cmd_busy         <= 1'b0;
+                                    state            <= ST_IDLE;
+                                end
                             end
 
                             default: begin
                                 cmd_error <= 1'b1;
+                                cmd_busy  <= 1'b0;
                                 state     <= ST_IDLE;
                             end
                         endcase

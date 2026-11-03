@@ -489,11 +489,12 @@ module gpu_top (
         .blue         (gen_blue)
     );
 
-    // Automatically transition to game rendering once commands begin arriving
+    // Keep the 8-bar color test pattern displayed on boot until a frame swap
+    // or hardware draw operation occurs (ignores SPI pin noise or NOP/palette upload)
     always @(posedge w_clk_pixel) begin
         if (core_reset)
             render_mode <= 1'b0; // Default on boot: crisp test pattern
-        else if (w_cmd_busy || w_swap_pending)
+        else if (w_swap_pending || w_clear_busy || w_sprite_busy || w_line_busy || w_rect_busy)
             render_mode <= 1'b1; // Switch to live game framebuffer
     end
 

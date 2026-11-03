@@ -65,7 +65,7 @@ module rasterizer #(
     // =========================================================================
     localparam [22:0] FB0_BASE = 23'h000000;
     localparam [22:0] FB1_BASE = 23'h050000;
-    wire [22:0] dst_base = buf_back_idx ? FB1_BASE : FB0_BASE;
+    reg [22:0] dst_base;
 
     // =========================================================================
     // FSM State Encoding
@@ -225,6 +225,7 @@ module rasterizer #(
             clip_y0      <= 9'd0;
             clip_y1      <= 9'd0;
             clear_addr   <= 19'd0;
+            dst_base     <= FB1_BASE;
         end else begin
             // Default 1-cycle strobe deassertions
             line_done  <= 1'b0;
@@ -236,10 +237,12 @@ module rasterizer #(
                 // ST_IDLE: Await Draw Trigger
                 // -------------------------------------------------------------
                 ST_IDLE: begin
-                    mem_wr <= 1'b0;
+                    mem_wr   <= 1'b0;
+                    mem_wr32 <= 1'b0;
 
                     if (line_start) begin
                         active_color <= line_color;
+                        dst_base     <= buf_back_idx ? FB1_BASE : FB0_BASE;
 
                         if (line_trivial_reject) begin
                             // 1-cycle early exit for off-screen lines
@@ -259,6 +262,7 @@ module rasterizer #(
                         end
                     end else if (rect_start) begin
                         active_color <= rect_color;
+                        dst_base     <= buf_back_idx ? FB1_BASE : FB0_BASE;
 
                         if (rect_trivial_reject) begin
                             // 1-cycle early exit for empty or off-screen rects
@@ -278,6 +282,7 @@ module rasterizer #(
                         end
                     end else if (clear_start) begin
                         active_color <= clear_color;
+                        dst_base     <= buf_back_idx ? FB1_BASE : FB0_BASE;
                         clear_addr   <= 19'd0;
                         state        <= ST_CLEAR_REQ;
                     end

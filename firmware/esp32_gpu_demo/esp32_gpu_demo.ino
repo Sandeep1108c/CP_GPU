@@ -148,8 +148,11 @@ void setup() {
                   (status & GPU_STATUS_RECT_BUSY) != 0,
                   (status & GPU_STATUS_FRONT_BUF) != 0);
 
-    // Upload palette & sprites into FPGA SDRAM/BRAM
+    // Upload palette & sprites into FPGA SDRAM/BRAM (8-bar test pattern stays visible)
     upload_assets_to_fpga();
+
+    Serial.println("[INIT] Displaying FPGA 8-bar color test pattern for 2 seconds...");
+    delay(2000);
 
     Serial.println("\n[DEMO] Starting 60 FPS Render Loop! Check HDMI monitor.\n");
 }

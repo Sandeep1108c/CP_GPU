@@ -72,7 +72,7 @@ static uint8_t spi_transfer_packet(uint8_t cmd, uint8_t len, const uint8_t *payl
     t_hdr.tx_buffer = tx_header;
     t_hdr.rx_buffer = rx_header;
     spi_device_polling_transmit(s_spi_dev, &t_hdr);
-    last_telemetry = rx_header[0];
+    last_telemetry = (rx_header[1] & 0xF0) | ((rx_header[0] | rx_header[1]) & 0x0F);
 
     // 2. Send Payload (if any)
     if (len > 0 && payload != NULL) {
@@ -90,8 +90,9 @@ static uint8_t spi_transfer_packet(uint8_t cmd, uint8_t len, const uint8_t *payl
     SPI.beginTransaction(s_spi_settings);
     cs_low();
 
-    last_telemetry = SPI.transfer(tx_header[0]);
-    SPI.transfer(tx_header[1]);
+    uint8_t b0 = SPI.transfer(tx_header[0]);
+    uint8_t b1 = SPI.transfer(tx_header[1]);
+    last_telemetry = (b1 & 0xF0) | ((b0 | b1) & 0x0F);
 
     for (int i = 0; i < len; i++) {
         uint8_t b = SPI.transfer(payload ? payload[i] : 0x00);
@@ -285,7 +286,27 @@ void gpu_load_palette_all(const uint8_t palette_rgb_array[768]) {
 void gpu_swap_buffers(void) {
     // Do not submit PRESENT until every back-buffer write has drained.
     gpu_wait_idle();
+    uint8_t pre_status = gpu_get_status();
+    uint8_t prev_front = pre_status & GPU_STATUS_FRONT_BUF;
+
     spi_transfer_packet(GPU_OP_SWAP_BUFFER, 0, NULL, NULL);
+
+    // Wait for VSYNC rising edge to flip buf_front_idx before the next frame's
+    // gpu_clear() begins wiping the new back buffer (max ~25 ms timeout).
+    uint32_t count = 1250;
+    while (--count) {
+#if defined(ESP_PLATFORM)
+        ets_delay_us(20);
+#elif defined(ARDUINO)
+        delayMicroseconds(20);
+#endif
+        uint8_t st = gpu_get_status();
+        if ((st & GPU_STATUS_SIG_MASK) == GPU_STATUS_SIG_EXPECTED) {
+            if ((st & GPU_STATUS_FRONT_BUF) != prev_front) {
+                break;
+            }
+        }
+    }
 }
 
 // =============================================================================
