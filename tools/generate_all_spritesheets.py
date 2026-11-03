@@ -973,16 +973,6 @@ def main():
         sheet.save(char_sheet_path)
         print(f"      Saved {char_sheet_path}")
 
-    # World Tiles
-    world_tiles = draw_world_tiles()
-    tiles_sheet = Image.new("RGBA", (16 * len(world_tiles), 16), (0, 0, 0, 0))
-    for idx, (name, img) in enumerate(world_tiles):
-        tiles_sheet.paste(img, (idx * 16, 0), img)
-        all_sprites.append({"name": name, "img": img, "width": 16, "height": 16})
-    tiles_sheet_path = os.path.join(RAW_DIR, "tileset_world.png")
-    tiles_sheet.save(tiles_sheet_path)
-    print(f"[2/6] World Tileset saved: {tiles_sheet_path} ({len(world_tiles)} tiles)")
-
     # Clues & Props
     clues_and_props = draw_clues_and_props()
     # Calculate width
@@ -991,13 +981,34 @@ def main():
     cur_x = 0
     for name, img in clues_and_props:
         props_sheet.paste(img, (cur_x, 0), img)
-        all_sprites.append({"name": name, "img": img, "width": img.size[0], "height": img.size[1]})
         cur_x += img.size[0]
     props_sheet_path = os.path.join(RAW_DIR, "clues_and_props.png")
     props_sheet.save(props_sheet_path)
-    print(f"[3/6] Investigation Props saved: {props_sheet_path} ({len(clues_and_props)} props)")
+    print(f"[2/6] Investigation Props saved: {props_sheet_path} ({len(clues_and_props)} props)")
 
-    # UI Elements
+    # Place 32x32 props (PROP_HANDCART, 1024B) immediately after the 6 character blocks (offset 0x004800)
+    # so that every 32x32, 16x32, and 16x16 sprite sits on an exact multiple of its byte size
+    # for the FPGA hardware blitter (src_base = 0x100000 + (sprite_id * size_bytes)).
+    for name, img in clues_and_props:
+        if img.size == (32, 32):
+            all_sprites.append({"name": name, "img": img, "width": 32, "height": 32})
+
+    # World Tiles (16x16, 256B each)
+    world_tiles = draw_world_tiles()
+    tiles_sheet = Image.new("RGBA", (16 * len(world_tiles), 16), (0, 0, 0, 0))
+    for idx, (name, img) in enumerate(world_tiles):
+        tiles_sheet.paste(img, (idx * 16, 0), img)
+        all_sprites.append({"name": name, "img": img, "width": 16, "height": 16})
+    tiles_sheet_path = os.path.join(RAW_DIR, "tileset_world.png")
+    tiles_sheet.save(tiles_sheet_path)
+    print(f"[3/6] World Tileset saved: {tiles_sheet_path} ({len(world_tiles)} tiles)")
+
+    # Remaining 16x16 Clues & Props (256B each)
+    for name, img in clues_and_props:
+        if img.size != (32, 32):
+            all_sprites.append({"name": name, "img": img, "width": img.size[0], "height": img.size[1]})
+
+    # UI Elements (16x16, 256B each)
     ui_elements = draw_ui_elements()
     ui_w = sum(img.size[0] for _, img in ui_elements)
     ui_sheet = Image.new("RGBA", (ui_w, 16), (0, 0, 0, 0))
@@ -1021,18 +1032,24 @@ def main():
     header_path = os.path.join(INCLUDE_DIR, "all_sprites.h")
 
     total_sdram_bytes = 0
+    all_bytes = bytearray()
     with open(sprites_bin_path, "wb") as f_bin:
         for s in all_sprites:
             indexed_data = image_to_indexed_bytes(s["img"], palette)
             s["data"] = indexed_data
             s["offset"] = total_sdram_bytes
             s["size_bytes"] = len(indexed_data)
+            assert s["offset"] % s["size_bytes"] == 0, (
+                f"Alignment error for {s['name']}: offset 0x{s['offset']:X} not divisible by {s['size_bytes']}"
+            )
+            s["hw_id"] = s["offset"] // s["size_bytes"]
             f_bin.write(indexed_data)
+            all_bytes.extend(indexed_data)
             total_sdram_bytes += len(indexed_data)
 
     print(f"[6/6] Compiled SDRAM binary: {sprites_bin_path} ({total_sdram_bytes} bytes for {len(all_sprites)} sprites)")
 
-    # 5. Write C Header for ESP32 Firmware
+    # 5. Write C Header for ESP32 Firmware (all_sprites.h)
     with open(header_path, "w") as f_h:
         f_h.write("/**\n")
         f_h.write(" * @file all_sprites.h\n")
@@ -1046,10 +1063,10 @@ def main():
         f_h.write(f"#define TOTAL_SPRITE_SDRAM_BYTES {total_sdram_bytes}\n")
         f_h.write("#define SDRAM_SPRITE_BASE_ADDR   0x100000\n\n")
 
-        # Enum IDs
+        # Hardware Blitter Sprite IDs (offset / size_bytes)
         f_h.write("typedef enum {\n")
-        for idx, s in enumerate(all_sprites):
-            f_h.write(f"    SPRITE_ID_{s['name']} = {idx},\n")
+        for s in all_sprites:
+            f_h.write(f"    SPRITE_ID_{s['name']} = {s['hw_id']}, // offset 0x{s['offset']:06X} ({s['width']}x{s['height']})\n")
         f_h.write("} sprite_id_t;\n\n")
 
         # Sprite Metadata Struct
@@ -1063,12 +1080,81 @@ def main():
         f_h.write("} sprite_meta_t;\n\n")
 
         f_h.write("static const sprite_meta_t SPRITE_MANIFEST[] = {\n")
-        for idx, s in enumerate(all_sprites):
-            f_h.write(f'    {{"{s["name"]}", {idx}, {s["width"]}, {s["height"]}, 0x{s["offset"]:06X}, {s["size_bytes"]}}},\n')
+        for s in all_sprites:
+            f_h.write(f'    {{"{s["name"]}", {s["hw_id"]}, {s["width"]}, {s["height"]}, 0x{s["offset"]:06X}, {s["size_bytes"]}}},\n')
         f_h.write("};\n\n")
         f_h.write("#endif // ALL_SPRITES_H\n")
 
     print(f"      C Header exported: {header_path}")
+
+    # 6. Write complete embedded sprites.h with pixel arrays and palette for ESP32 Sketch & Firmware
+    embedded_paths = [
+        os.path.join(INCLUDE_DIR, "sprites.h"),
+        os.path.join(PROJECT_ROOT, "firmware", "esp32_gpu_demo", "sprites.h"),
+    ]
+    for emb_path in embedded_paths:
+        with open(emb_path, "w") as f_emb:
+            f_emb.write("/**\n")
+            f_emb.write(" * @file sprites.h\n")
+            f_emb.write(" * @brief Complete 'Catch the Thief' 51-Sprite & 256-Color Palette Asset Pack\n")
+            f_emb.write(" * Auto-generated by tools/generate_all_spritesheets.py\n")
+            f_emb.write(" */\n\n")
+            f_emb.write("#ifndef SPRITES_H\n")
+            f_emb.write("#define SPRITES_H\n\n")
+            f_emb.write("#include <stdint.h>\n\n")
+            f_emb.write(f"#define TOTAL_SPRITES_COUNT      {len(all_sprites)}\n")
+            f_emb.write(f"#define TOTAL_SPRITE_COUNT       {len(all_sprites)}\n")
+            f_emb.write(f"#define TOTAL_SPRITES_BYTES      {total_sdram_bytes}\n")
+            f_emb.write(f"#define TOTAL_SPRITE_SDRAM_BYTES {total_sdram_bytes}\n")
+            f_emb.write("#define SDRAM_SPRITE_BASE_ADDR   0x100000\n\n")
+
+            f_emb.write("// Hardware Blitter Sprite IDs (src_base = 0x100000 + id * size_bytes)\n")
+            f_emb.write("typedef enum {\n")
+            for s in all_sprites:
+                f_emb.write(f"    SPRITE_ID_{s['name']} = {s['hw_id']}, // offset 0x{s['offset']:06X} ({s['width']}x{s['height']})\n")
+            f_emb.write("    // Legacy Demo Compatibility Aliases\n")
+            f_emb.write("    SPRITE_ID_TILE_STONE = SPRITE_ID_TILE_COBBLESTONE,\n")
+            f_emb.write("    SPRITE_ID_TILE_WALL = SPRITE_ID_TILE_BRICK_WALL,\n")
+            f_emb.write("    SPRITE_ID_PLAYER_DOWN_0 = SPRITE_ID_HERO_ZERO_WALK1,\n")
+            f_emb.write("    SPRITE_ID_PLAYER_DOWN_1 = SPRITE_ID_HERO_ZERO_WALK2,\n")
+            f_emb.write("    SPRITE_ID_BOSS_DRAGON = SPRITE_ID_PROP_HANDCART\n")
+            f_emb.write("} sprite_id_t;\n\n")
+
+            f_emb.write("typedef struct {\n")
+            f_emb.write("    const char *name;\n")
+            f_emb.write("    uint16_t id;\n")
+            f_emb.write("    uint16_t width;\n")
+            f_emb.write("    uint16_t height;\n")
+            f_emb.write("    uint32_t sdram_offset;\n")
+            f_emb.write("    uint16_t byte_length;\n")
+            f_emb.write("} sprite_meta_t;\n\n")
+
+            f_emb.write("static const sprite_meta_t SPRITE_METADATA[] = {\n")
+            for s in all_sprites:
+                f_emb.write(f'    {{"{s["name"]}", {s["hw_id"]}, {s["width"]}, {s["height"]}, 0x{s["offset"]:06X}, {s["size_bytes"]}}},\n')
+            f_emb.write("};\n\n")
+
+            f_emb.write("// 256-Color Master Palette (768 bytes: R, G, B)\n")
+            f_emb.write("static const uint8_t DEFAULT_GPU_PALETTE[768] = {\n")
+            for i in range(0, 768, 12):
+                chunk = palette[i:i+12]
+                hex_str = ", ".join(f"0x{b:02X}" for b in chunk)
+                f_emb.write(f"    {hex_str},\n")
+            f_emb.write("};\n\n")
+
+            f_emb.write(f"// Contiguous 24,576-Byte SDRAM Asset Pack (51 Sprites)\n")
+            f_emb.write(f"static const uint8_t ALL_SPRITES_DATA[{total_sdram_bytes}] = {{\n")
+            for s in all_sprites:
+                f_emb.write(f"    // --- {s['name']} (hw_id={s['hw_id']}, {s['width']}x{s['height']}, offset=0x{s['offset']:06X}, {s['size_bytes']} bytes) ---\n")
+                data = s["data"]
+                for i in range(0, len(data), 16):
+                    chunk = data[i:i+16]
+                    hex_str = ", ".join(f"0x{b:02X}" for b in chunk)
+                    f_emb.write(f"    {hex_str},\n")
+            f_emb.write("};\n\n")
+            f_emb.write("#endif // SPRITES_H\n")
+        print(f"      Embedded C Header exported: {emb_path}")
+
     print("\n[SUCCESS] All spritesheets, assets, poster, binaries, and C headers generated successfully!\n")
 
 if __name__ == "__main__":

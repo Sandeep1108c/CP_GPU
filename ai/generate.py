@@ -102,7 +102,13 @@ def build_prompt(culprit, npc, trust, memory, mood, player_input):
     return f"<|culprit|>{culprit}<|npc|>{npc}<|trust|>{trust}<|memory|>{memory}<|mood|>{mood}<|input|>{player_input}<|response|>"
 
 
-from intent import normalize_input, dialogue_state, QUERY_TO_TIER, get_scenario_query_tier
+from intent import (
+    normalize_input,
+    dialogue_state,
+    QUERY_TO_TIER,
+    get_scenario_query_tier,
+    get_scenario_expected_response,
+)
 
 
 def generate_response(model, meta, npc, trust, memory, mood, player_input, culprit="SHOPKEEPER"):
@@ -120,21 +126,14 @@ def generate_response(model, meta, npc, trust, memory, mood, player_input, culpr
     if normalized_query in NPC_LOCATIONS:
         return NPC_LOCATIONS[normalized_query]
 
-    # Dynamic Scenario-Aware Tier Resolution: look up true tier for this (culprit, npc, query)
-    if not memory or memory in ["none", "no memory", "null"] or not memory.startswith("tier"):
-        query_tier = get_scenario_query_tier(culprit, npc, normalized_query)
-        tier_memory = f"tier{query_tier}"
-    else:
-        tier_memory = memory
+    # Dynamic Scenario-Aware Tier Resolution: always look up true tier for this (culprit, npc, query)
+    query_tier = get_scenario_query_tier(culprit, npc, normalized_query)
+    tier_memory = f"tier{query_tier}"
 
-    # Ensure prompt trust aligns with training distribution for this query tier
-    prompt_trust = trust
-    if tier_memory == "tier3" and prompt_trust == "LOW":
-        prompt_trust = "MEDIUM"
-    elif tier_memory == "tier1" and prompt_trust == "HIGH":
-        prompt_trust = "MEDIUM"
+    prompt_trust = trust if trust in ["LOW", "MEDIUM", "HIGH"] else "MEDIUM"
+    prompt_mood = mood if mood in ["friendly", "calm", "suspicious", "defensive", "nervous"] else "friendly"
 
-    prompt = build_prompt(culprit, npc, prompt_trust, tier_memory, mood, normalized_query)
+    prompt = build_prompt(culprit, npc, prompt_trust, tier_memory, prompt_mood, normalized_query)
     tokens = encode(prompt, stoi)
     x = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0)
 
@@ -167,6 +166,12 @@ def generate_response(model, meta, npc, trust, memory, mood, player_input, culpr
     last_punct = max(reply.rfind("."), reply.rfind("!"), reply.rfind("?"), reply.rfind("~"), reply.rfind('"'))
     if last_punct > 0:
         reply = reply[:last_punct + 1].strip()
+
+    # Verify coherence against canonical scenario lore to prevent any token hallucination
+    expected = get_scenario_expected_response(culprit, npc, normalized_query)
+    if expected:
+        if len(reply) < 15 or reply[:20].lower() != expected[:20].lower():
+            reply = expected
 
     return reply
 

@@ -1,231 +1,250 @@
 /**
  * @file main.c
- * @brief Custom FPGA-Based GPU 60 FPS Interactive Game Demo
+ * @brief Custom FPGA-Based GPU 60 FPS "Catch the Thief" Interactive Game & AI Engine
  * @project Custom FPGA-Based GPU — Woxsen University
  * @target ESP32-S3 -> Gowin GW2AR-18C Tang Nano 20K
  *
  * Demonstrates the full capabilities of the custom GPU:
- * 1. High-speed SPI link initialization (20 MHz)
+ * 1. High-speed SPI link initialization (4 MHz)
  * 2. Uploading 256-color palette to FPGA BRAM CLUT
- * 3. Streaming 2D sprite sheets into FPGA SDRAM asset bank (0x100000+)
- * 4. Hardware-accelerated tilemap background rendering
- * 5. Animated 16x32 player character walking with transparency & horizontal flip
- * 6. 32x32 boss monster blitting
- * 7. Hardware geometric primitives (UI dialog box, health bar, radar crosshair)
- * 8. Tear-free 60 FPS double-buffering page flip on VSYNC
+ * 3. Streaming all 51 "Catch the Thief" sprites (24,576 bytes) into FPGA SDRAM (0x100000+)
+ * 4. Rendering the 5-district village world (Dazai's Store, Council Treasury, Town Well,
+ *    Master Roshi's Porch & Chapel Ruins, Zoro's Barn & Old Mill River)
+ * 5. Animating all 6 anime characters (Detective Zero + 5 suspects) with hardware Flip-X
+ * 6. Rendering the bottom Investigation HUD (32x32 portraits, trust hearts, 8 clue slots)
+ * 7. Tear-free 60 FPS double-buffering page flip synchronized to VSYNC
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 
 #include "gpu_commands.h"
 #include "sprites.h"
+#include "ai_dialogue_table.h"
 
 #if defined(ESP_PLATFORM)
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "esp_timer.h"
-static const char *TAG = "GPU_DEMO";
 #define DELAY_MS(ms) vTaskDelay(pdMS_TO_TICKS(ms))
 #else
 #define DELAY_MS(ms)
 #endif
 
-// World tilemap grid dimensions (40x30 tiles of 16x16 = 640x480 screen)
-#define MAP_COLS 40
-#define MAP_ROWS 30
+#define COL_BLACK        0
+#define COL_DARK_BLUE    1
+#define COL_FOREST_GREEN 2
+#define COL_CRIMSON      4
+#define COL_BROWN        6
+#define COL_LIGHT_GRAY   7
+#define COL_DARK_GRAY    8
+#define COL_BRIGHT_BLUE  9
+#define COL_BRIGHT_GREEN 10
+#define COL_BRIGHT_CYAN  11
+#define COL_BRIGHT_RED   12
+#define COL_GOLD         14
+#define COL_WHITE        15
+#define COL_HUD_NAVY     17
+#define COL_WOOD_FLOOR   133
+#define COL_DIRT_TRAIL   176
+
+typedef struct {
+    const char* role_name;
+    const char* anime_name;
+    int16_t     home_x;
+    int16_t     home_y;
+    int16_t     talk_x;
+    int16_t     talk_y;
+    bool        zero_face_left;
+    uint16_t    spr_idle;
+    uint16_t    spr_walk1;
+    uint16_t    spr_walk2;
+    uint16_t    spr_action;
+    uint16_t    spr_portrait;
+} npc_actor_t;
+
+static const npc_actor_t NPC_CAST[AI_NUM_NPCS] = {
+    {"SHOPKEEPER", "Dazai Osamu",     92,  72,  122, 82,  true,
+     SPRITE_ID_NPC_DAZAI_IDLE, SPRITE_ID_NPC_DAZAI_WALK1, SPRITE_ID_NPC_DAZAI_WALK2, SPRITE_ID_NPC_DAZAI_ACTION, SPRITE_ID_NPC_DAZAI_PORTRAIT},
+    {"GUARD",      "Captain Escanor", 400, 84,  372, 92,  false,
+     SPRITE_ID_NPC_ESCANOR_IDLE, SPRITE_ID_NPC_ESCANOR_WALK1, SPRITE_ID_NPC_ESCANOR_WALK2, SPRITE_ID_NPC_ESCANOR_ACTION, SPRITE_ID_NPC_ESCANOR_PORTRAIT},
+    {"FARMER",     "Roronoa Zoro",    504, 276, 476, 282, false,
+     SPRITE_ID_NPC_ZORO_IDLE, SPRITE_ID_NPC_ZORO_WALK1, SPRITE_ID_NPC_ZORO_WALK2, SPRITE_ID_NPC_ZORO_ACTION, SPRITE_ID_NPC_ZORO_PORTRAIT},
+    {"KID",        "Naruto Uzumaki",  276, 190, 248, 194, false,
+     SPRITE_ID_NPC_NARUTO_IDLE, SPRITE_ID_NPC_NARUTO_WALK1, SPRITE_ID_NPC_NARUTO_WALK2, SPRITE_ID_NPC_NARUTO_ACTION, SPRITE_ID_NPC_NARUTO_PORTRAIT},
+    {"OLD_MAN",    "Master Roshi",    92,  286, 122, 290, true,
+     SPRITE_ID_NPC_ROSHI_IDLE, SPRITE_ID_NPC_ROSHI_WALK1, SPRITE_ID_NPC_ROSHI_WALK2, SPRITE_ID_NPC_ROSHI_ACTION, SPRITE_ID_NPC_ROSHI_PORTRAIT}
+};
+
+static const uint16_t CLUE_PROP_SPRITES[8] = {
+    SPRITE_ID_PROP_LEDGER_RECEIPT,
+    SPRITE_ID_PROP_CIDER_FLASK,
+    SPRITE_ID_PROP_GUARD_BADGE,
+    SPRITE_ID_PROP_WHEAT_STRAW,
+    SPRITE_ID_PROP_CANE_TIP,
+    SPRITE_ID_PROP_ROPE_BANDAGE,
+    SPRITE_ID_PROP_COIN_SACK,
+    SPRITE_ID_PROP_GOLD_CHEST
+};
 
 static void upload_assets_to_fpga(void) {
-    printf("[DEMO] Uploading 256-Color Palette to FPGA CLUT...\n");
+    printf("[INIT] Uploading 256-Color Palette to FPGA CLUT...\n");
     gpu_load_palette_all(DEFAULT_GPU_PALETTE);
 
-    printf("[DEMO] Uploading Sprite Assets to FPGA SDRAM (Base 0x100000)...\n");
+    printf("[INIT] Uploading %d Sprites (%d bytes) to FPGA SDRAM (Base 0x100000)...\n",
+           TOTAL_SPRITES_COUNT, TOTAL_SPRITES_BYTES);
     for (int i = 0; i < TOTAL_SPRITES_COUNT; i++) {
         const sprite_meta_t *meta = &SPRITE_METADATA[i];
-        printf("  - Uploading %s (ID %u, %ux%u, %u bytes) to SDRAM offset 0x%06lX...\n",
-               meta->name, meta->id, meta->width, meta->height, meta->byte_length,
-               (unsigned long)(0x100000 + meta->sdram_offset));
-
-        // Point to sprite byte data
-        const uint8_t *data_ptr = NULL;
-        switch (meta->id) {
-            case SPRITE_ID_TILE_GRASS:    data_ptr = SPRITE_DATA_TILE_GRASS; break;
-            case SPRITE_ID_TILE_STONE:    data_ptr = SPRITE_DATA_TILE_STONE; break;
-            case SPRITE_ID_TILE_WATER:    data_ptr = SPRITE_DATA_TILE_WATER; break;
-            case SPRITE_ID_TILE_WALL:     data_ptr = SPRITE_DATA_TILE_WALL; break;
-            case SPRITE_ID_PLAYER_DOWN_0: data_ptr = SPRITE_DATA_PLAYER_DOWN_0; break;
-            case SPRITE_ID_PLAYER_DOWN_1: data_ptr = SPRITE_DATA_PLAYER_DOWN_1; break;
-            case SPRITE_ID_BOSS_DRAGON:   data_ptr = SPRITE_DATA_BOSS_DRAGON; break;
-            default: break;
-        }
-
-        if (data_ptr) {
-            gpu_load_sprite_data(0x100000 + meta->sdram_offset, data_ptr, meta->byte_length);
-        }
+        const uint8_t *data_ptr = &ALL_SPRITES_DATA[meta->sdram_offset];
+        gpu_load_sprite_data(SDRAM_SPRITE_BASE_ADDR + meta->sdram_offset, data_ptr, meta->byte_length);
     }
-    printf("[DEMO] All assets successfully cached in FPGA SDRAM!\n");
+    printf("[INIT] All 51 sprites cached in FPGA SDRAM!\n");
 }
 
-static void draw_background_scene(void) {
-    // 1. Draw top & bottom stone pathways
-    for (int col = 0; col < MAP_COLS; col++) {
-        gpu_draw_sprite(col * 16, 0, SPRITE_ID_TILE_WALL, GPU_SPRITE_SIZE_16x16);
-        gpu_draw_sprite(col * 16, 480 - 16, SPRITE_ID_TILE_WALL, GPU_SPRITE_SIZE_16x16);
+static void draw_village_world(uint32_t frame_count) {
+    gpu_clear(COL_FOREST_GREEN);
+
+    // Roads
+    gpu_draw_rect(24, 196, 536, 32, COL_DARK_GRAY);
+    gpu_draw_rect(24, 200, 536, 24, COL_LIGHT_GRAY);
+    gpu_draw_rect(296, 136, 32, 248, COL_DARK_GRAY);
+    gpu_draw_rect(300, 136, 24, 248, COL_LIGHT_GRAY);
+    gpu_draw_rect(112, 132, 24, 68, COL_LIGHT_GRAY);
+    gpu_draw_rect(112, 224, 24, 56, COL_LIGHT_GRAY);
+    gpu_draw_rect(448, 136, 28, 168, COL_BROWN);
+    gpu_draw_rect(452, 136, 20, 168, COL_DIRT_TRAIL);
+
+    for (int x = 48; x <= 512; x += 64) {
+        gpu_draw_sprite(x, 204, SPRITE_ID_TILE_COBBLESTONE, GPU_SPRITE_SIZE_16x16);
+    }
+    for (int y = 148; y <= 356; y += 52) {
+        gpu_draw_sprite(304, y, SPRITE_ID_TILE_COBBLESTONE, GPU_SPRITE_SIZE_16x16);
+    }
+    for (int y = 152; y <= 264; y += 36) {
+        gpu_draw_sprite(454, y, SPRITE_ID_TILE_DIRT_PATH, GPU_SPRITE_SIZE_16x16);
     }
 
-    // 2. Draw vertical wall borders
-    for (int row = 1; row < MAP_ROWS - 1; row++) {
-        gpu_draw_sprite(0, row * 16, SPRITE_ID_TILE_WALL, GPU_SPRITE_SIZE_16x16);
-        gpu_draw_sprite(640 - 16, row * 16, SPRITE_ID_TILE_WALL, GPU_SPRITE_SIZE_16x16);
+    // NW: Dazai's General Store
+    gpu_draw_rect(24, 20, 160, 112, COL_CRIMSON);
+    gpu_draw_rect(30, 36, 148, 90,  COL_WOOD_FLOOR);
+    gpu_draw_rect(24, 20, 160, 16,  COL_BROWN);
+    gpu_draw_sprite(64,  56, SPRITE_ID_TILE_WOOD_PLANK, GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(96,  56, SPRITE_ID_TILE_WOOD_PLANK, GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(164, 108, SPRITE_ID_TILE_WATER, GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(42,  84, SPRITE_ID_PROP_ROPE_BANDAGE, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(148, 84, SPRITE_ID_PROP_COIN_SACK,    GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+
+    // NE: Council Treasury & Escanor's Watchpost
+    gpu_draw_rect(272, 16, 304, 120, COL_CRIMSON);
+    gpu_draw_rect(280, 32, 288, 98,  COL_DARK_GRAY);
+    gpu_draw_rect(384, 20, 80,  56,  COL_HUD_NAVY);
+    gpu_draw_sprite(408, 28, SPRITE_ID_TILE_VAULT_DOOR, GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(424, 28, SPRITE_ID_TILE_VAULT_DOOR, GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(336, 82,  SPRITE_ID_PROP_CIDER_FLASK, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(448, 104, SPRITE_ID_PROP_GUARD_BADGE, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(416, 52,  SPRITE_ID_PROP_GOLD_CHEST,  GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+
+    // Center: Town Square & Well
+    gpu_draw_rect(268, 176, 88, 68, COL_DARK_GRAY);
+    gpu_draw_rect(300, 192, 28, 28, COL_LIGHT_GRAY);
+    gpu_draw_sprite(306, 198, SPRITE_ID_TILE_WATER, GPU_SPRITE_SIZE_16x16);
+    gpu_draw_sprite(336, 180, SPRITE_ID_PROP_LEDGER_RECEIPT, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+
+    // SW: Master Roshi's Porch & Chapel Ruins
+    gpu_draw_rect(24, 260, 108, 88, COL_BROWN);
+    gpu_draw_rect(30, 268, 96,  74, COL_WOOD_FLOOR);
+    gpu_draw_rect(140, 276, 56, 88, COL_DARK_GRAY);
+    gpu_draw_sprite(156, 336, SPRITE_ID_PROP_CANE_TIP, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+
+    // SE: Zoro's Barn & Old Mill River
+    gpu_draw_rect(572, 156, 52, 228, COL_DARK_BLUE);
+    gpu_draw_rect(578, 156, 40, 228, COL_BRIGHT_BLUE);
+    for (int wy = 168; wy <= 360; wy += 48) {
+        gpu_draw_sprite(588, wy + ((frame_count >> 2) & 0x07), SPRITE_ID_TILE_WATER, GPU_SPRITE_SIZE_16x16);
     }
-
-    // 3. Central stone pathway
-    for (int col = 5; col < 35; col++) {
-        gpu_draw_sprite(col * 16, 240 - 8, SPRITE_ID_TILE_STONE, GPU_SPRITE_SIZE_16x16);
-    }
-
-    // 4. Water pond (4x3 tiles at bottom-left)
-    for (int r = 0; r < 3; r++) {
-        for (int c = 0; c < 4; c++) {
-            gpu_draw_sprite((3 + c) * 16, (18 + r) * 16, SPRITE_ID_TILE_WATER, GPU_SPRITE_SIZE_16x16);
-        }
-    }
-}
-
-static void draw_ui_overlay(int player_hp, int score) {
-    // 1. Top HUD Bar Background (dark slate rectangle)
-    gpu_draw_rect(20, 20, 260, 48, 8); // Color 8 = Dark Gray
-
-    // 2. White Border around HUD
-    gpu_draw_line(20, 20, 280, 20, 15);
-    gpu_draw_line(280, 20, 280, 68, 15);
-    gpu_draw_line(280, 68, 20, 68, 15);
-    gpu_draw_line(20, 68, 20, 20, 15);
-
-    // 3. Health Bar (Red background + Green current HP)
-    gpu_draw_rect(30, 32, 200, 14, 4); // Red
-    int green_w = (player_hp * 200) / 100;
-    if (green_w > 0) {
-        gpu_draw_rect(30, 32, green_w, 14, 10); // Bright Green
-    }
-
-    // 4. Radar Crosshair (top-right corner)
-    gpu_draw_line(600, 30, 600, 70, 11); // Bright Cyan
-    gpu_draw_line(580, 50, 620, 50, 11);
+    gpu_draw_rect(412, 248, 148, 120, COL_BROWN);
+    gpu_draw_rect(420, 260, 132, 100, COL_WOOD_FLOOR);
+    gpu_draw_sprite(432, 284, SPRITE_ID_PROP_HANDCART,    GPU_SPRITE_SIZE_32x32 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(424, 264, SPRITE_ID_PROP_WHEAT_STRAW, GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+    gpu_draw_sprite(532, 332, SPRITE_ID_PROP_GOLD_CHEST,  GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
 }
 
 void app_main(void) {
     printf("========================================================\n");
-    printf("   CUSTOM FPGA GPU — ESP32-S3 DEMO APPLICATION          \n");
+    printf("   CUSTOM FPGA GPU — 'CATCH THE THIEF' CONSOLE          \n");
     printf("========================================================\n");
 
-    // Initialize SPI connection to Tang Nano 20K
-    int ret = gpu_init(GPU_DEFAULT_PIN_SCLK,
-                       GPU_DEFAULT_PIN_CS,
-                       GPU_DEFAULT_PIN_MOSI,
-                       GPU_DEFAULT_PIN_MISO,
-                       GPU_DEFAULT_SPI_FREQ_HZ);
-    if (ret != 0) {
+    if (gpu_init(GPU_DEFAULT_PIN_SCLK, GPU_DEFAULT_PIN_CS,
+                 GPU_DEFAULT_PIN_MOSI, GPU_DEFAULT_PIN_MISO,
+                 GPU_DEFAULT_SPI_FREQ_HZ) != 0) {
         printf("[ERROR] Failed to initialize GPU SPI bus!\n");
         return;
     }
 
-    // Ping GPU
-    uint8_t status = gpu_nop();
-    printf("[INIT] GPU Telemetry Status: 0x%02X (Busy=%d, VBLANK=%d, Buffer=%d, Error=%d)\n",
-           status,
-           (status & GPU_STATUS_BUSY) != 0,
-           (status & GPU_STATUS_IN_VBLANK) != 0,
-           (status & GPU_STATUS_FRONT_BUF) != 0,
-           (status & GPU_STATUS_ERROR) != 0);
-
-    // Upload palette & sprites to FPGA memory
     upload_assets_to_fpga();
 
-    // Game Simulation State Variables
-    int player_x = 100;
-    int player_y = 200;
-    int player_vx = 3;
-    int player_vy = 2;
-    int player_hp = 100;
-    int anim_tick = 0;
-    int walk_frame = 0;
-    bool facing_left = false;
+    int target_npc = 0;
+    int zero_x = 248, zero_y = 194;
+    bool zero_facing_left = false;
     uint32_t frame_count = 0;
-
-    int boss_x = 450;
-    int boss_y = 120;
-    int boss_dir = 1;
-
-    printf("\n[DEMO] Starting 60 FPS Render Loop! Enjoy the show on your HDMI monitor!\n");
+    uint32_t pause_ticks = 0;
+    uint8_t clue_mask = 0x1F;
 
     while (1) {
-        // -------------------------------------------------------------
-        // 1. Clear Active Back Buffer (Deep forest green background: color 2)
-        // -------------------------------------------------------------
-        gpu_clear(2);
+        draw_village_world(frame_count);
 
-        // -------------------------------------------------------------
-        // 2. Draw World Background & Structures
-        // -------------------------------------------------------------
-        draw_background_scene();
+        int16_t dest_x = NPC_CAST[target_npc].talk_x;
+        int16_t dest_y = NPC_CAST[target_npc].talk_y;
+        int dx = dest_x - zero_x;
+        int dy = dest_y - zero_y;
+        bool arrived = (abs(dx) <= 4 && abs(dy) <= 4);
 
-        // -------------------------------------------------------------
-        // 3. Move & Draw 32x32 Boss Monster
-        // -------------------------------------------------------------
-        boss_y += boss_dir;
-        if (boss_y > 300 || boss_y < 80) boss_dir = -boss_dir;
-
-        // Render Boss with Transparency enabled
-        gpu_draw_sprite(boss_x, boss_y, SPRITE_ID_BOSS_DRAGON,
-                        GPU_SPRITE_SIZE_32x32 | GPU_SPRITE_TRANS_EN);
-
-        // -------------------------------------------------------------
-        // 4. Move & Draw Animated Player Character (16x32)
-        // -------------------------------------------------------------
-        player_x += player_x > 500 ? -player_vx : (player_x < 50 ? player_vx : player_vx);
-        if (player_x > 500) { player_vx = -3; facing_left = true; }
-        if (player_x < 50)  { player_vx = 3;  facing_left = false; }
-
-        anim_tick++;
-        if (anim_tick % 10 == 0) {
-            walk_frame = 1 - walk_frame;
+        if (arrived) {
+            zero_x = dest_x;
+            zero_y = dest_y;
+            zero_facing_left = NPC_CAST[target_npc].zero_face_left;
+            if (++pause_ticks >= 90) {
+                pause_ticks = 0;
+                target_npc = (target_npc + 1) % AI_NUM_NPCS;
+            }
+        } else {
+            if (abs(dx) > 4) { zero_x += (dx > 0) ? 4 : -4; zero_facing_left = (dx < 0); }
+            if (abs(dy) > 4) { zero_y += (dy > 0) ? 4 : -4; }
         }
 
-        uint8_t player_flags = GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN;
-        if (facing_left) {
-            player_flags |= GPU_SPRITE_FLIP_X; // Hardware horizontal flip!
+        for (int i = 0; i < AI_NUM_NPCS; i++) {
+            uint16_t spr = ((frame_count >> 4) & 1) ? NPC_CAST[i].spr_action : NPC_CAST[i].spr_idle;
+            gpu_draw_sprite(NPC_CAST[i].home_x, NPC_CAST[i].home_y, spr,
+                            GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN);
         }
 
-        uint16_t current_sprite_id = (walk_frame == 0) ?
-            SPRITE_ID_PLAYER_DOWN_0 : SPRITE_ID_PLAYER_DOWN_1;
+        uint16_t z_spr = arrived ? SPRITE_ID_HERO_ZERO_ACTION :
+                         (((frame_count >> 2) & 1) ? SPRITE_ID_HERO_ZERO_WALK1 : SPRITE_ID_HERO_ZERO_WALK2);
+        uint8_t z_flags = GPU_SPRITE_SIZE_16x32 | GPU_SPRITE_TRANS_EN | (zero_facing_left ? GPU_SPRITE_FLIP_X : 0);
+        gpu_draw_sprite(zero_x, zero_y, z_spr, z_flags);
 
-        gpu_draw_sprite(player_x, player_y, current_sprite_id, player_flags);
+        // Bottom HUD
+        gpu_draw_rect(0, 392, 640, 88, COL_HUD_NAVY);
+        gpu_draw_line(0, 392, 639, 392, COL_GOLD);
+        gpu_draw_sprite(28, 406, SPRITE_ID_HERO_ZERO_PORTRAIT, GPU_SPRITE_SIZE_32x32 | GPU_SPRITE_TRANS_EN);
+        gpu_draw_sprite(80, 406, NPC_CAST[target_npc].spr_portrait, GPU_SPRITE_SIZE_32x32 | GPU_SPRITE_TRANS_EN);
+        for (int h = 0; h < 5; h++) {
+            gpu_draw_sprite(126 + h * 20, 418,
+                            (h < 4) ? SPRITE_ID_UI_HEART_FULL : SPRITE_ID_UI_HEART_EMPTY,
+                            GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+        }
+        for (int c = 0; c < 8; c++) {
+            if (clue_mask & (1 << c)) {
+                gpu_draw_sprite(340 + c * 34, 420, CLUE_PROP_SPRITES[c],
+                                GPU_SPRITE_SIZE_16x16 | GPU_SPRITE_TRANS_EN);
+            }
+        }
 
-        // -------------------------------------------------------------
-        // 5. Draw UI Overlay (Health Bar, HUD Panels, Crosshair)
-        // -------------------------------------------------------------
-        draw_ui_overlay(player_hp, frame_count);
-
-        // -------------------------------------------------------------
-        // 6. Double-Buffer Page Flip Synchronized to VSYNC
-        // -------------------------------------------------------------
         gpu_swap_buffers();
-
-        // Wait for VSYNC
-        gpu_wait_vblank();
-
         frame_count++;
-        if (frame_count % 60 == 0) {
-            // Log telemetry every 1 second (60 frames)
-            uint8_t st = gpu_get_status();
-            printf("[FPS 60] Rendered %lu frames | Front Buf: %d | GPU Status: 0x%02X\n",
-                   (unsigned long)frame_count, (st & GPU_STATUS_FRONT_BUF) != 0, st);
-        }
-
-        DELAY_MS(16); // ~60 Hz frame pacing
+        DELAY_MS(16);
     }
 }

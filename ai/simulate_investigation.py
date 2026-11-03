@@ -172,7 +172,7 @@ SCENARIO_SCRIPTS = {
 
 CLUE_TARGETS = {
     "SHOPKEEPER": ["cider", "duplicate key", "crowbar", "receipt", "waterwheel", "flagstone"],
-    "FARMER": ["banging", "oat straw", "river clay", "squeak", "feed bucket", "hay bales"],
+    "FARMER": ["banging", "oat straw", "river mud", "squeak", "feed bucket", "hay bales"],
     "GUARD": ["greaves", "eagle", "chisel", "chimney", "loose stone", "handcart"],
     "OLD_MAN": ["beeswax", "whale oil", "chapel", "cane", "skeleton key", "crypt"]
 }

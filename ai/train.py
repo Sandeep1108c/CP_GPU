@@ -39,27 +39,27 @@ block_size = 160     # Line-aware sequence length
 n_layer = 6          # 6 layers
 n_head = 8           # 8 heads (248 is divisible by 8 -> head_dim = 31)
 n_embd = 248         # 248 embedding dimension
-dropout = 0.02       # Minimal dropout so model firmly learns facts, names, and exact phrasing
+dropout = 0.00       # Zero dropout for exact character dialogue & clue retention
 
-# Training — tuned for firm convergence without premature cutoff
-batch_size = 32
-max_iters = 3500
+# Training — tuned for rapid, exact convergence on RTX 4050
+batch_size = 64
+max_iters = 2000
 eval_interval = 100
-eval_iters = 50
-log_interval = 50
-patience = 35        # High patience: allows the model to fully learn all 4 scenarios
+eval_iters = 30
+log_interval = 100
+patience = 25        # High patience: allows the model to fully learn all 4 scenarios
 
 # Optimizer
-learning_rate = 4e-4
-weight_decay = 0.05
+learning_rate = 6e-4
+weight_decay = 0.01
 beta1 = 0.9
 beta2 = 0.99
 grad_clip = 1.0
 
 # LR schedule
-warmup_iters = 80
-lr_decay_iters = 3500
-min_lr = 4e-5
+warmup_iters = 50
+lr_decay_iters = 2000
+min_lr = 5e-5
 
 # System
 device = "cuda" if torch.cuda.is_available() else "cpu"
